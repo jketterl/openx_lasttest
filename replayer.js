@@ -180,8 +180,6 @@ var doRequest = function(client, request) {
 		'User-Agent': request.userAgent
 	});
 	httpRequest.addListener('response', function(response){
-		//clearTimeout(response.client.timeout);
-		if (response.client.timedOut) return; 
 		if (isSuccess(response.statusCode) && !isSuccess(request.statusCode)) stats.unExpectedSuccesses++;
 		if (!isSuccess(response.statusCode) && isSuccess(request.statusCode)) stats.unExpectedErrors++;
 		stats.urls++;
@@ -242,13 +240,6 @@ var doRequest = function(client, request) {
 	client.setTimeout(10000);
 	client.timeoutStarted = new Date();
 	httpRequest.end();
-	/*
-	client.timeout = setTimeout(function(){
-		sys.puts('timeout occured!');
-		client.timedOut = true;
-		doRequest(null, reader, request);
-	}, 30000);
-	*/
 	lastExecutedTimestamp = request.timestamp;
 };
 
