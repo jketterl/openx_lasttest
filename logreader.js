@@ -3,7 +3,7 @@ var url = require('url');
 var querystring = require('querystring');
 var sys = require('sys');
 
-exports.class = function(filename){
+function LogReader(filename){
 	this.buffer = [];
 	this.callbackQueue = [];
 	this.afterOpen = [];
@@ -13,7 +13,7 @@ exports.class = function(filename){
 	this.open();
 };
 
-exports.class.prototype.open = function(callback){
+LogReader.prototype.open = function(callback){
 	if (typeof(this.fd) != 'undefined') {
 		if (callback) callback();
 		return;
@@ -27,7 +27,7 @@ exports.class.prototype.open = function(callback){
 	}.bind(this));
 };
 
-exports.class.prototype.shift = function(callback){
+LogReader.prototype.shift = function(callback){
 	if (this.buffer.length == 0) {
 		if (this.interval) {
 			// fill the queue
@@ -43,7 +43,7 @@ exports.class.prototype.shift = function(callback){
 	callback(line);
 };
 
-exports.class.prototype.read = function(callback){
+LogReader.prototype.read = function(callback){
 	if (typeof(this.fd) == 'undefined') {
 		this.afterOpen.push(function(){
 			this.read(callback);
@@ -55,7 +55,7 @@ exports.class.prototype.read = function(callback){
 	fs.read(this.fd, 8096, null, 'iso8859-1', this.processFileInput.bind(this));
 };
 
-exports.class.prototype.processFileInput = function(err, data, bytesRead){
+LogReader.prototype.processFileInput = function(err, data, bytesRead){
 	if (err) throw err;
 	// split up into lines
 	var lines = (this.buf + data).split('\n');
@@ -73,7 +73,7 @@ exports.class.prototype.processFileInput = function(err, data, bytesRead){
 	while (this.callbackQueue.length) this.callbackQueue.shift()();
 };
 
-exports.class.prototype.processLine = function(line){
+LogReader.prototype.processLine = function(line){
 	var details = /([0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}) ([^ ]) ([^ ]) \[([0-9]{1,2}\/[a-zA-Z]{3}\/[0-9]{4}:[0-9]{2}:[0-9]{2}:[0-9]{2} \+[0-9]{4})\] "([A-Z]*) ([^ ]*)[^"]*" ([0-9]*) ([0-9]*) "([^"]*)" "([^"]*)"/.exec(line);
 	if (details == null) return;
 	var date = /([0-9]{1,2})\/([a-zA-Z]{3})\/([0-9]{4}):([0-9]{2}):([0-9]{2}):([0-9]{2}) \+[0-9]{4}/.exec(details[4]);
@@ -98,7 +98,7 @@ exports.class.prototype.processLine = function(line){
 	this.buffer.push(request);
 };
 
-exports.class.prototype.getFirstTimestamp = function(callback){
+LogReader.prototype.getFirstTimestamp = function(callback){
 	if (typeof(this.firstTimestamp) == 'undefined') {
 		this.read(function(){
 			callback(this.firstTimestamp);
@@ -108,8 +108,10 @@ exports.class.prototype.getFirstTimestamp = function(callback){
 	}
 };
 
-exports.class.prototype.onOpen = function()
+LogReader.prototype.onOpen = function()
 {
 	if (typeof(this.afterOpen) == 'undefined') return;
 	while (this.afterOpen.length) this.afterOpen.shift()();
 };
+
+module.exports = LogReader;

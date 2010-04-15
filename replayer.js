@@ -4,8 +4,8 @@ var http = require('http');
 var url = require('url');
 var querystring = require('querystring');
 var document = require('./document');
-var LogReader = require('./logreader').class;
-var EventCollector = require('./eventcollector').class;
+var LogReader = require('./logreader');
+var EventCollector = require('./eventcollector');
 
 var timeDelta = null;
 var startTime = new Date();
@@ -30,27 +30,24 @@ var getClient = function(reader){
 	var client = http.createClient(80, servername);
 	client.id = clientNum++;
 	client.reader = reader;
-	sys.puts('handing out client id: ' + client.id);
+	sys.puts(new Date() + ' handing out client id: ' + client.id);
 	client.addListener('timeout', function(){
 		var cClient = client;
 		return function(){
+			if (cClient.timedOut) return; else cClient.timedOut = true;
 			sys.puts('http client timeout on id: ' + cClient.id);
 			sys.puts(new Date() - cClient.timeoutStarted);
 			doRequest(getClient(cClient.reader), cClient.request);
-			cClient.destroy();
+			//cClient.destroy();
 		};
 	}());
 	client.addListener('error', function(){
 		var cClient = client;
 		return function(err){
-			if (typeof(err) != 'object') {
-				sys.puts('WTF error un-object');
-				startRequestSpooling(getClient(cClient.reader));
-				//doRequest(null, cClient.reader, cClient.request);
-				cClient.destroy();
-				return;
-			}
-			sys.puts('\n' + err.message);
+			if (cClient.hasError) return; else cClient.hasError = true;
+			if (cClient.timedOut) return;
+			sys.puts(new Date() + ' Error "' + err.message + '" on client id: ' + cClient.id);
+			if (typeof(err) != 'object') return;
 			switch (err.message) {
 				case 'EHOSTUNREACH, No route to host':
 					setTimeout(function(){
@@ -59,13 +56,15 @@ var getClient = function(reader){
 							doRequest(getClient(ccClient.reader), ccClient.request);
 						};
 					}(), 1000);
-					cClient.destroy();
+					//cClient.destroy();
 					break;
 				case 'Parse Error':
+				case 'EINVAL, Invalid argument':
 					stats.unParsed++;
-					startRequestSpooling(getClient(cClient.reader));
-					//doRequest(null, cClient.reader, cClient.request);
-					cClient.destroy();
+					process.nextTick(function(){
+						startRequestSpooling(getClient(cClient.reader));
+					});
+					//cClient.destroy();
 					break;
 				default: throw err;
 			}
@@ -173,6 +172,7 @@ var isSuccess = function(responseCode){
 };
 
 var doRequest = function(client, request) {
+	if (client.timedOut || client.hasError) return;
 	client.current = request;
 	var httpRequest = client.request(request.method, request.url, {
 		host: servername,
@@ -180,6 +180,8 @@ var doRequest = function(client, request) {
 		'User-Agent': request.userAgent
 	});
 	httpRequest.addListener('response', function(response){
+		if (response.client.timedOut || response.client.hasError) return;
+		clearTimeout(response.client.timeout);
 		if (isSuccess(response.statusCode) && !isSuccess(request.statusCode)) stats.unExpectedSuccesses++;
 		if (!isSuccess(response.statusCode) && isSuccess(request.statusCode)) stats.unExpectedErrors++;
 		stats.urls++;
@@ -231,15 +233,22 @@ var doRequest = function(client, request) {
 				stats.unParsed++;
 			}
 		});
-		startRequestSpooling(response.client);
+		process.nextTick(function(){
+			var client = response.client;
+			return function(){
+				startRequestSpooling(client);
+			};
+		}());
 	});
-	httpRequest.addListener('error', function(){
-		sys.puts('error');
-		sys.puts(sys.inspect(arguments));
-	});
-	client.setTimeout(10000);
-	client.timeoutStarted = new Date();
 	httpRequest.end();
+	client.setTimeout(10000);
+	client.timeout = setTimeout(function(){
+		sys.puts('timeout on client id ' + client.id);
+		client.timedOut = true;
+		process.nextTick(function(){
+			doRequest(getClient(client.reader), client.current);
+		});
+	}, 10000);
 	lastExecutedTimestamp = request.timestamp;
 };
 

@@ -1,4 +1,4 @@
-exports.class = function(config) {
+function EventCollector(config) {
     this.config = config;
     this.expectedEvents = config.expectedEvents || [];
     var c = this;
@@ -15,10 +15,12 @@ exports.class = function(config) {
     };
 };
 
-exports.class.prototype.setEvents = function(expectedEvents) {
+EventCollector.prototype.setEvents = function(expectedEvents) {
     this.expectedEvents = expectedEvents;
 };
 
-exports.class.prototype.addEvent = function(event) {
+EventCollector.prototype.addEvent = function(event) {
     this.expectedEvents.push(event);
 };
+
+module.exports = EventCollector;
