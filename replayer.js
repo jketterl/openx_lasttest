@@ -30,7 +30,7 @@ var getClient = function(reader){
 	var client = http.createClient(80, servername);
 	client.id = clientNum++;
 	client.reader = reader;
-	sys.puts(new Date() + ' handing out client id: ' + client.id);
+	//sys.puts(new Date() + ' handing out client id: ' + client.id);
 	client.addListener('timeout', function(){
 		var cClient = client;
 		return function(){
@@ -38,12 +38,13 @@ var getClient = function(reader){
 			sys.puts('http client timeout on id: ' + cClient.id);
 			sys.puts(new Date() - cClient.timeoutStarted);
 			doRequest(getClient(cClient.reader), cClient.request);
-			//cClient.destroy();
+			cClient.destroy();
 		};
 	}());
 	client.addListener('error', function(){
 		var cClient = client;
 		return function(err){
+			if (client.timeout) clearTimeout(client.timeout);
 			if (cClient.hasError) return; else cClient.hasError = true;
 			if (cClient.timedOut) return;
 			sys.puts(new Date() + ' Error "' + err.message + '" on client id: ' + cClient.id);
@@ -53,16 +54,20 @@ var getClient = function(reader){
 					setTimeout(function(){
 						var ccClient = cClient;
 						return function(){
-							doRequest(getClient(ccClient.reader), ccClient.request);
+							ccClient.hasError = false;
+							ccClient.timedOut = false;
+							doRequest(ccClient, ccClient.request);
 						};
-					}(), 1000);
+					}(), 10000);
 					//cClient.destroy();
 					break;
 				case 'Parse Error':
 				case 'EINVAL, Invalid argument':
 					stats.unParsed++;
 					process.nextTick(function(){
-						startRequestSpooling(getClient(cClient.reader));
+						cClient.hasError = false;
+						cClient.timedOut = false;
+						startRequestSpooling(cClient);
 					});
 					//cClient.destroy();
 					break;
@@ -116,8 +121,9 @@ var collector = new EventCollector({
 			}
 			var now = new Date();
 			var simTime = new Date(now - timeDelta);
-			sys.print('simTime: ' + simTime + '; ');
+			sys.print('simTime: ' + simTime.toUTCString() + '; ');
 			sys.print('lag: ' + Math.round((simTime - lastExecutedTimestamp) / 1000) + 's; ');
+			sys.print('urls: ' + stats.urls + '; ');
 			sys.print('pace: ' + Math.round(stats.urls / (now - startTime) * 10000) / 10 + '/s; ');
 			sys.print('unparsed: ' + stats.unParsed + '; ');
 			sys.print('!XE: ' + stats.unExpectedErrors + '; !XS: ' + stats.unExpectedSuccesses + '; ');
@@ -245,6 +251,7 @@ var doRequest = function(client, request) {
 	client.timeout = setTimeout(function(){
 		sys.puts('timeout on client id ' + client.id);
 		client.timedOut = true;
+		if (client.hasError) return;
 		process.nextTick(function(){
 			doRequest(getClient(client.reader), client.current);
 		});
