@@ -113,7 +113,7 @@ var collector = new EventCollector({
 		var statsInterval = setInterval(function(){
 			var delivered = 0;
 			if (stats.timed.length) {
-				while (stats.timed[0].timestamp < lastReadTimestamp - 3600000) stats.timed.shift();
+				while (stats.timed[0].timestamp < lastExecutedTimestamp - 3600000) stats.timed.shift();
 				for (var i = 0; i < stats.timed.length; i++) {
 					if (stats.timed[i].success) delivered++;
 				}
@@ -122,7 +122,7 @@ var collector = new EventCollector({
 			var now = new Date();
 			var simTime = new Date(now - timeDelta);
 			var message = '';
-			message += 'simTime: ' + simTime.toUTCString() + '; ';
+			message += simTime.toUTCString() + '; ';
 			message += 'lag: ' + Math.round((simTime - lastExecutedTimestamp) / 1000) + 's; ';
 			message += 'urls: ' + stats.urls + '; ';
 			message += 'OP: ' + Math.round(stats.urls / (now - startTime) * 10000) / 10 + '/s; ';
