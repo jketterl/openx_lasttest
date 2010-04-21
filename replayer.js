@@ -111,26 +111,29 @@ var collector = new EventCollector({
 			}
 		}
 		var statsInterval = setInterval(function(){
-			var calls = 0; var delivered = 0;
+			var delivered = 0;
 			if (stats.timed.length) {
 				while (stats.timed[0].timestamp < lastReadTimestamp - 3600000) stats.timed.shift();
 				for (var i = 0; i < stats.timed.length; i++) {
-					calls++;
 					if (stats.timed[i].success) delivered++;
 				}
 			}
+			var calls = stats.timed.length;
 			var now = new Date();
 			var simTime = new Date(now - timeDelta);
-			sys.print('simTime: ' + simTime.toUTCString() + '; ');
-			sys.print('lag: ' + Math.round((simTime - lastExecutedTimestamp) / 1000) + 's; ');
-			sys.print('urls: ' + stats.urls + '; ');
-			sys.print('pace: ' + Math.round(stats.urls / (now - startTime) * 10000) / 10 + '/s; ');
-			sys.print('unparsed: ' + stats.unParsed + '; ');
-			sys.print('!XE: ' + stats.unExpectedErrors + '; !XS: ' + stats.unExpectedSuccesses + '; ');
-			sys.print('calls: ' + stats.called + '; delivered: ' + stats.delivered + ' (' + (Math.round(stats.delivered / stats.called * 1000) / 10) + '%); ');
-			sys.print('1h: ' + (Math.round(delivered / calls * 1000) / 10) + '%');
-			sys.print('    \r');
-		}, 100);
+			var message = '';
+			message += 'simTime: ' + simTime.toUTCString() + '; ';
+			message += 'lag: ' + Math.round((simTime - lastExecutedTimestamp) / 1000) + 's; ';
+			message += 'urls: ' + stats.urls + '; ';
+			message += 'OP: ' + Math.round(stats.urls / (now - startTime) * 10000) / 10 + '/s; ';
+			message += 'CP: ' + Math.round(calls / (simTime - stats.timed[0].timestamp) * 10000) / 10 + '/s; ';
+			message += 'unparsed: ' + stats.unParsed + '; ';
+			message += '!XE: ' + stats.unExpectedErrors + '; !XS: ' + stats.unExpectedSuccesses + '; ';
+			message += 'calls: ' + stats.called + '; delivered: ' + stats.delivered + ' (' + (Math.round(stats.delivered / stats.called * 1000) / 10) + '%); ';
+			message += '1h: ' + (Math.round(delivered / calls * 1000) / 10) + '%';
+			message +='    \r';
+			sys.print(message);
+		}, 1000);
 	}
 });
 
